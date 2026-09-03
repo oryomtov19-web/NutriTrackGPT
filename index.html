@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0b0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="NutriTrack" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/icon-180.png" />
+  <title>NutriTrack — קלוריות וחלבון</title>
+  <style>
+    :root{color-scheme:dark;--bg:#08090d;--card:#15171f;--card2:#1d202a;--text:#f7f8fb;--muted:#9ca3b5;--line:#292d39;--cal:#ff375f;--protein:#64d2ff;--good:#30d158;--warn:#ffd60a}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent} body{margin:0;background:radial-gradient(circle at 50% -10%,#232632 0,#0b0c11 38%,var(--bg) 75%);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Arial,sans-serif;color:var(--text);min-height:100vh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+    .app{max-width:620px;margin:auto;padding:18px 16px 34px}.top{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 18px}.top h1{font-size:30px;margin:0;letter-spacing:-.7px}.gear{border:0;background:var(--card);color:#fff;font-size:20px;width:42px;height:42px;border-radius:14px}.datebar{display:flex;gap:8px;align-items:center;justify-content:center;margin-bottom:16px}.datebar button,.chip{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:12px;padding:9px 12px;font-weight:700}.date-label{min-width:165px;text-align:center;font-weight:800}
+    .hero{background:linear-gradient(150deg,#171922,#101218);border:1px solid #242833;border-radius:28px;padding:22px 18px;box-shadow:0 18px 55px rgba(0,0,0,.28)}.rings{display:flex;justify-content:center;gap:18px;flex-wrap:wrap}.ring{--p:0;--c:#fff;width:142px;height:142px;border-radius:50%;background:conic-gradient(var(--c) calc(var(--p)*1%),#2b2e38 0);position:relative;display:grid;place-items:center}.ring::after{content:"";position:absolute;inset:13px;border-radius:50%;background:#11131a;box-shadow:inset 0 0 0 1px #252933}.ring-content{position:relative;z-index:1;text-align:center}.ring-value{font-size:27px;font-weight:900;line-height:1}.ring-unit{font-size:12px;color:var(--muted);margin-top:5px}.ring-label{font-size:13px;font-weight:800;margin-top:5px}.summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}.stat{background:#0d0f15;border:1px solid #242833;border-radius:16px;padding:12px;text-align:center}.stat b{font-size:18px}.stat span{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+    .section{margin-top:20px}.section h2{font-size:20px;margin:0 2px 10px}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px}.smart textarea{width:100%;min-height:88px;resize:none;border:1px solid #303542;background:#0e1016;color:#fff;border-radius:15px;padding:13px;font:inherit;outline:none}.smart textarea:focus{border-color:#5e6472}.actions{display:flex;gap:8px;margin-top:10px}.btn{border:0;border-radius:14px;padding:12px 14px;font-weight:900;font-size:15px}.primary{background:#fff;color:#0b0b0f;flex:1}.secondary{background:#272b36;color:#fff}.preview{display:none;margin-top:12px;background:#0f1117;border-radius:15px;padding:12px;border:1px solid #282c36}.preview.show{display:block}.preview-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #242832}.preview-row:last-child{border:0}.quick{display:flex;gap:8px;overflow:auto;padding-bottom:3px;scrollbar-width:none}.quick::-webkit-scrollbar{display:none}.quick button{white-space:nowrap;border:1px solid var(--line);background:var(--card);color:#fff;border-radius:999px;padding:10px 13px;font-weight:750}.food-list{display:flex;flex-direction:column;gap:9px}.food{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);padding:12px 13px;border-radius:17px}.food-main{flex:1;min-width:0}.food-name{font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.food-meta{font-size:13px;color:var(--muted);margin-top:3px}.delete{border:0;background:#31171e;color:#ff6b82;width:36px;height:36px;border-radius:11px;font-size:18px}.empty{text-align:center;color:var(--muted);padding:24px 8px}.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.58);align-items:flex-end;justify-content:center;z-index:20}.modal-bg.show{display:flex}.modal{width:min(620px,100%);background:#15171f;border-radius:25px 25px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));border:1px solid #2c303b}.modal h3{margin:0 0 16px;font-size:22px}.field{margin:10px 0}.field label{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}.field input{width:100%;border:1px solid #303542;background:#0e1016;color:#fff;border-radius:13px;padding:12px;font-size:16px}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.footer{color:#686f80;text-align:center;font-size:11px;margin:26px 0 4px}.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);opacity:0;background:#f4f4f6;color:#111;padding:11px 15px;border-radius:999px;font-weight:800;transition:.2s;z-index:40}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    @media(max-width:390px){.ring{width:128px;height:128px}.top h1{font-size:27px}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="top"><h1>NutriTrack</h1><button class="gear" id="settingsBtn" aria-label="הגדרות">⚙︎</button></div>
+  <div class="datebar"><button id="nextDay">‹</button><div class="date-label" id="dateLabel"></div><button id="prevDay">›</button></div>
+  <div class="hero">
+    <div class="rings">
+      <div class="ring" id="calRing" style="--c:var(--cal)"><div class="ring-content"><div class="ring-value" id="calValue">0</div><div class="ring-unit">מתוך <span id="calGoalText">1800</span></div><div class="ring-label">קלוריות</div></div></div>
+      <div class="ring" id="proteinRing" style="--c:var(--protein)"><div class="ring-content"><div class="ring-value" id="proteinValue">0g</div><div class="ring-unit">מתוך <span id="proteinGoalText">140</span>g</div><div class="ring-label">חלבון</div></div></div>
+    </div>
+    <div class="summary"><div class="stat"><b id="calRemaining">1800</b><span>קלוריות נשארו</span></div><div class="stat"><b id="proteinRemaining">140g</b><span>חלבון נשאר</span></div></div>
+  </div>
+
+  <div class="section"><h2>הוספה חכמה</h2><div class="card smart"><textarea id="smartInput" placeholder="למשל: 200 גרם שניצל + 150 גרם אורז + בקבוק פרו"></textarea><div class="actions"><button class="btn primary" id="analyzeBtn">פתח ב‑ChatGPT</button><button class="btn secondary" id="manualBtn">הוספה ידנית</button></div><div class="preview" id="preview"></div></div></div>
+  <div class="section"><h2>הוספה מהירה</h2><div class="quick" id="quick"></div></div>
+  <div class="section"><h2>מה אכלתי</h2><div class="food-list" id="foodList"></div></div>
+  <div class="footer">היומן נשמר מקומית במכשיר. פתיחה ב‑ChatGPT משתמשת באפליקציה/אתר ChatGPT שלך ואינה דורשת API key ב‑NutriTrack. את התוצאה מחזירים ידנית לאפליקציה.</div>
+</div>
+
+<div class="modal-bg" id="manualModal"><div class="modal"><h3>הוספת מאכל</h3><div class="field"><label>שם המאכל</label><input id="manualName" placeholder="למשל: שניצל"></div><div class="two"><div class="field"><label>קלוריות</label><input id="manualCal" inputmode="decimal" type="number" min="0"></div><div class="field"><label>חלבון (גרם)</label><input id="manualProtein" inputmode="decimal" type="number" min="0" step="0.1"></div></div><div class="actions"><button class="btn primary" id="saveManual">הוסף</button><button class="btn secondary closeModal">ביטול</button></div></div></div>
+<div class="modal-bg" id="settingsModal"><div class="modal"><h3>יעדים יומיים</h3><div class="two"><div class="field"><label>יעד קלוריות</label><input id="goalCal" type="number" min="1"></div><div class="field"><label>יעד חלבון</label><input id="goalProtein" type="number" min="1"></div></div><div class="actions"><button class="btn primary" id="saveSettings">שמור</button><button class="btn secondary closeModal">ביטול</button></div></div></div>
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+
+<div class="modal" id="chatgptResultModal">
+  <div class="sheet">
+    <h2>הדבק תוצאה מ‑ChatGPT</h2>
+    <p style="color:var(--muted);font-size:13px;line-height:1.5">
+      חזור מ‑ChatGPT והדבק כאן את התוצאה. אפשר להדביק JSON שהוחזר לפי הפורמט שביקשנו.
+    </p>
+    <div class="field">
+      <label>תוצאת ChatGPT</label>
+      <textarea id="chatgptResult" rows="8" dir="auto" placeholder='{"items":[{"name":"שניצל","calories":600,"protein":40}]}'></textarea>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="importChatGPT">ייבא ליומן</button>
+      <button class="btn ghost closeModal">ביטול</button>
+    </div>
+  </div>
+</div>
+
+</body></html>
