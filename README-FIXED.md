@@ -11,3 +11,4 @@ This build restores the original user-friendly flow.
 - No API key is used and there is no separate API billing.
 
 To update GitHub Pages, replace the old repository files with the files from this ZIP and commit them. The service worker cache version was bumped so installed PWAs can receive the new build.
+Redeploy
