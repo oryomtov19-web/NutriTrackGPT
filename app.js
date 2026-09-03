@@ -38,66 +38,161 @@ function dayItems(){return state.days[selectedDate]||[]}
 function addFood(name,cal,protein){state.days[selectedDate]??=[];state.days[selectedDate].push({id:crypto.randomUUID?.()||String(Date.now()+Math.random()),name,cal:+cal,protein:+protein,ts:Date.now()});save();render();toast('נוסף ליום')}
 function round(n,d=0){const p=10**d;return Math.round(n*p)/p}
 
+
+function normalizeHebrewNumberWords(s){
+ const map=[
+   ['שלושה','3'],['שלוש','3'],['שתי','2'],['שני','2'],['שניים','2'],['שתיים','2'],
+   ['אחת','1'],['אחד','1']
+ ];
+ let out=s;
+ map.forEach(([w,n])=>out=out.replace(new RegExp(`\\b${w}\\b`,'g'),n));
+ return out;
+}
+
 function parseSmart(text){
- const normalized=text.toLowerCase().replace(/,/g,' + ').replace(/\n/g,' + ');
- const parts=normalized.split(/\+| וגם | עם /).map(s=>s.trim()).filter(Boolean);
+ const normalized=normalizeHebrewNumberWords(
+   text.toLowerCase()
+     .replace(/[،;]/g,',')
+     .replace(/\n/g,' + ')
+     .replace(/\s*,\s*/g,' + ')
+     .replace(/\s+וגם\s+/g,' + ')
+ );
+ const parts=normalized.split(/\s*\+\s*/).map(s=>s.trim()).filter(Boolean);
  const out=[]; const unknown=[];
+
  for(let part of parts){
    let matched=false;
-   for(const f of foods){const key=f.keys.find(k=>part.includes(k));if(!key)continue; const before=part.slice(0,part.indexOf(key)); const after=part.slice(part.indexOf(key)+key.length); const all=before+' '+after; const gm=all.match(/(\d+(?:\.\d+)?)\s*(?:גרם|ג(?:רם)?\b|gr?\b)/); const grams=gm?+gm[1]:100; out.push({name:`${f.name} — ${round(grams)} גרם`,cal:round(f.per100[0]*grams/100),protein:round(f.per100[1]*grams/100,1)});matched=true;break;}
+
+   // Exact values supplied by the user, e.g. "PRO 130 calories 25 protein".
+   const explicitCal=part.match(/(\d+(?:\.\d+)?)\s*(?:קלוריות|קלוריה|קל׳|kcal)/);
+   const explicitProtein=part.match(/(\d+(?:\.\d+)?)\s*(?:גרם\s*)?(?:חלבון|protein)/i);
+   if(explicitCal && explicitProtein){
+     let count=1;
+     const cm=part.match(/(?:^|\s)(\d+)\s*(?:x|×|בקבוק(?:ים)?|יחידות?)?/);
+     if(cm && +cm[1] <= 20) count=Math.max(1,+cm[1]);
+     const name=part.replace(/\d+(?:\.\d+)?\s*(?:קלוריות|קלוריה|קל׳|kcal)/g,'')
+                    .replace(/\d+(?:\.\d+)?\s*(?:גרם\s*)?(?:חלבון|protein)/gi,'')
+                    .replace(/\s+/g,' ').trim() || 'פריט';
+     out.push({name,cal:round(+explicitCal[1]*count),protein:round(+explicitProtein[1]*count,1)});
+     continue;
+   }
+
+   // Weight-based foods.
+   for(const f of foods){
+     const key=f.keys.find(k=>part.includes(k));
+     if(!key)continue;
+     const gm=part.match(/(\d+(?:\.\d+)?)\s*(?:גרם|ג(?:רם)?\b|g(?:r)?\b)/i);
+     let grams=gm?+gm[1]:100;
+
+     // If wording says "together 200g" with 2 schnitzels, do NOT multiply the weight.
+     let cal=f.per100[0]*grams/100;
+     let protein=f.per100[1]*grams/100;
+
+     // Preparation modifiers for common foods.
+     if(f.name==='שניצל'){
+       if(/שמן עמוק|מטוגן עמוק|deep.?fried/.test(part)) cal*=1.12;
+       else if(/מטוגן|טיגון/.test(part)) cal*=1.06;
+     }
+     if(/מעט שמן|קצת שמן/.test(part)) cal+=35;
+     if(/כף שמן/.test(part)) cal+=120;
+
+     out.push({name:`${f.name} — ${round(grams)} גרם`,cal:round(cal),protein:round(protein,1)});
+     matched=true;break;
+   }
    if(matched)continue;
-   for(const u of units){const key=u.keys.find(k=>part.includes(k));if(!key)continue; const nm=part.match(/(^|\s)(\d+)\s*(?:x|×)?\s*(?=[א-תa-z])/i); let count=1; if(nm) count=Math.max(1,+nm[2]); if(part.includes('שני ')||part.includes('שתי '))count=2; if(part.includes('שלושה ')||part.includes('שלוש '))count=3; out.push({name:count>1?`${count} × ${u.name}`:u.name,cal:u.cal*count,protein:round(u.protein*count,1)});matched=true;break;}
+
+   // Unit foods (eggs, PRO bottles, pita).
+   for(const u of units){
+     const key=u.keys.find(k=>part.includes(k));
+     if(!key)continue;
+     let count=1;
+     const idx=part.indexOf(key);
+     const before=part.slice(0,idx);
+     const nums=[...before.matchAll(/(\d+(?:\.\d+)?)/g)].map(m=>+m[1]);
+     if(nums.length){
+       const candidate=nums[nums.length-1];
+       if(candidate>0 && candidate<=20) count=candidate;
+     }
+     out.push({
+       name:count>1?`${count} × ${u.name}`:u.name,
+       cal:round(u.cal*count),
+       protein:round(u.protein*count,1)
+     });
+     matched=true;break;
+   }
    if(!matched && part.length>1)unknown.push(part);
  }
  return {items:out,unknown};
 }
 
-
 function buildChatGPTPrompt(text){
- return `חשב לי את הקלוריות והחלבון בארוחה הבאה:
+ return `חשב לי קלוריות וחלבון עבור הארוחה הבאה:
 ${text}
 
-החזר הערכה ריאלית לפי הכמויות, אופן ההכנה, שמן/טיגון/רטבים אם צוינו.
-בסוף החזר גם JSON בלבד בפורמט הבא כדי שאוכל להדביק אותו ל-NutriTrack:
-{"items":[{"name":"שם המאכל","calories":123,"protein":12.3}]}
-אל תוסיף שדות אחרים ל-JSON.`;
+תן הערכה ריאלית וקצרה. לכל פריט כתוב בשורה:
+שם המאכל — X קלוריות — Y גרם חלבון
+ובסוף:
+סה"כ — X קלוריות — Y גרם חלבון
+
+אל תשתמש בטבלה ואל תשתמש ב-JSON.`;
 }
 
 async function openInChatGPT(){
  const text=document.querySelector('#smartInput').value.trim();
- if(!text)return toast('כתוב מה אכלת');
+ if(!text)return toast('כתוב קודם מה אכלת');
  const prompt=buildChatGPTPrompt(text);
- try{await navigator.clipboard.writeText(prompt);toast('הטקסט הועתק — הדבק אותו ב-ChatGPT');}
- catch(e){toast('פתח את ChatGPT והעתק אליו את תיאור הארוחה');}
- // Opening ChatGPT uses the user's signed-in ChatGPT account; no API key is embedded.
+ try{
+   await navigator.clipboard.writeText(prompt);
+   toast('הבקשה הועתקה');
+ }catch(e){
+   toast('לא הצלחתי להעתיק אוטומטית');
+ }
  window.open('https://chatgpt.com/','_blank','noopener');
 }
 
-function extractJson(text){
- const cleaned=text.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
- try{return JSON.parse(cleaned)}catch{}
- const a=cleaned.indexOf('{'), b=cleaned.lastIndexOf('}');
- if(a>=0&&b>a){return JSON.parse(cleaned.slice(a,b+1))}
- throw new Error('JSON_NOT_FOUND');
+function parseChatGPTPlainText(raw){
+ const lines=raw.split(/\n/).map(x=>x.trim()).filter(Boolean);
+ const items=[];
+ for(const line of lines){
+   if(/סה.?כ|total/i.test(line)) continue;
+   const cal=line.match(/(\d+(?:[.,]\d+)?)\s*(?:קלוריות|קלוריה|קל['׳]?|kcal)/i);
+   const prot=line.match(/(\d+(?:[.,]\d+)?)\s*(?:גרם\s*)?(?:חלבון|protein|g\s*protein)/i);
+   if(!cal || !prot) continue;
+   let name=line.split(/[—–|-]/)[0].trim()
+     .replace(/^[•*-]\s*/,'')
+     .replace(/^\d+[.)]\s*/,'');
+   if(!name || name.length>100) name='מאכל';
+   items.push({
+     name,
+     cal:round(parseFloat(cal[1].replace(',','.'))),
+     protein:round(parseFloat(prot[1].replace(',','.')),1)
+   });
+ }
+ return items;
 }
 
 function importChatGPTResult(){
- const raw=document.querySelector('#chatgptResult').value;
- try{
-   const data=extractJson(raw);
-   if(!Array.isArray(data.items)||!data.items.length)throw new Error('NO_ITEMS');
-   const items=data.items.map(i=>({
-     name:String(i.name||'מאכל').slice(0,80),
-     cal:Math.max(0,round(Number(i.calories)||0)),
-     protein:Math.max(0,round(Number(i.protein)||0,1))
-   }));
-   pending=items;
-   hideModals();
-   renderPreview({items,unknown:[]});
-   toast('התוצאה מוכנה לבדיקה');
- }catch(e){
-   toast('לא הצלחתי לקרוא את התוצאה. נסה להעתיק את ה-JSON מ-ChatGPT');
+ const raw=document.querySelector('#chatgptResult').value.trim();
+ if(!raw)return toast('הדבק את התשובה שקיבלת');
+ let items=parseChatGPTPlainText(raw);
+
+ // Backward compatibility: also accept JSON if it happens to be present.
+ if(!items.length){
+   try{
+     const a=raw.indexOf('{'),b=raw.lastIndexOf('}');
+     const data=JSON.parse(a>=0&&b>a?raw.slice(a,b+1):raw);
+     items=(data.items||[]).map(i=>({
+       name:String(i.name||'מאכל').slice(0,80),
+       cal:Math.max(0,round(Number(i.calories??i.cal)||0)),
+       protein:Math.max(0,round(Number(i.protein)||0,1))
+     })).filter(i=>i.cal||i.protein);
+   }catch{}
  }
+ if(!items.length)return toast('לא הצלחתי לזהות קלוריות וחלבון בתשובה');
+ pending=items;
+ hideModals();
+ renderPreview({items,unknown:[]});
+ toast('התוצאה מוכנה לבדיקה');
 }
 
 function render(){
@@ -113,12 +208,62 @@ function toast(msg){const t=document.querySelector('#toast');t.textContent=msg;t
 function showModal(id){document.querySelector(id).classList.add('show')}
 function hideModals(){document.querySelectorAll('.modal-bg').forEach(x=>x.classList.remove('show'))}
 
-function renderPreview(result){pending=result.items;const p=document.querySelector('#preview');p.innerHTML='';if(!result.items.length){p.classList.add('show');p.innerHTML='<div>לא הצלחתי לזהות את המאכלים. אפשר להשתמש בהוספה ידנית.</div>';return} result.items.forEach(i=>{const r=document.createElement('div');r.className='preview-row';r.innerHTML=`<span></span><b>${i.cal} קל׳ · ${i.protein}g</b>`;r.querySelector('span').textContent=i.name;p.appendChild(r)});const totalCal=round(result.items.reduce((s,x)=>s+x.cal,0)), totalP=round(result.items.reduce((s,x)=>s+x.protein,0),1);const sum=document.createElement('div');sum.style.marginTop='10px';sum.innerHTML=`<b>סה״כ: ${totalCal} קל׳ · ${totalP}g חלבון</b>${result.unknown.length?`<div style="color:var(--muted);font-size:12px;margin-top:5px">לא זוהה: ${result.unknown.map(escapeHtml).join(' · ')}</div>`:''}<button class="btn primary" style="width:100%;margin-top:10px" id="confirmSmart">הוסף ליום</button>`;p.appendChild(sum);p.classList.add('show');document.querySelector('#confirmSmart').onclick=()=>{pending.forEach(i=>addFood(i.name,i.cal,i.protein));p.classList.remove('show');document.querySelector('#smartInput').value='';pending=[]}}
+function renderPreview(result){
+ pending=result.items.map(i=>({...i}));
+ const p=document.querySelector('#preview');
+ p.innerHTML='';
+ if(!pending.length){
+   p.classList.add('show');
+   p.innerHTML='<div>לא הצלחתי לזהות את המאכלים. נסה לכתוב כמויות בגרמים, או השתמש בהוספה ידנית.</div>';
+   return;
+ }
+ pending.forEach((i,idx)=>{
+   const r=document.createElement('div');
+   r.className='preview-row';
+   r.innerHTML=`<span class="preview-name"></span>
+     <div class="preview-numbers">
+       <label style="font-size:11px;color:var(--muted)">kcal <input class="edit-cal" type="number" inputmode="decimal" min="0" value="${i.cal}"></label>
+       <label style="font-size:11px;color:var(--muted)">protein <input class="edit-protein" type="number" inputmode="decimal" min="0" step="0.1" value="${i.protein}"></label>
+     </div>`;
+   r.querySelector('.preview-name').textContent=i.name;
+   r.querySelector('.edit-cal').oninput=e=>{pending[idx].cal=Math.max(0,+e.target.value||0);updatePreviewTotal()};
+   r.querySelector('.edit-protein').oninput=e=>{pending[idx].protein=Math.max(0,+e.target.value||0);updatePreviewTotal()};
+   p.appendChild(r);
+ });
+ const sum=document.createElement('div');
+ sum.style.marginTop='12px';
+ sum.innerHTML=`<div id="previewTotal" style="font-size:17px;font-weight:900"></div>
+   ${result.unknown.length?`<div style="color:var(--warn);font-size:12px;margin-top:7px">לא זוהה: ${result.unknown.map(escapeHtml).join(' · ')}</div>`:''}
+   <button class="btn primary" style="width:100%;margin-top:12px" id="confirmSmart">הוסף ליום</button>`;
+ p.appendChild(sum);
+ p.classList.add('show');
+ updatePreviewTotal();
+ document.querySelector('#confirmSmart').onclick=()=>{
+   const items=[...pending];
+   state.days[selectedDate]??=[];
+   items.forEach(i=>state.days[selectedDate].push({
+     id:crypto.randomUUID?.()||String(Date.now()+Math.random()),
+     name:i.name,cal:+i.cal,protein:+i.protein,ts:Date.now()
+   }));
+   save();render();
+   p.classList.remove('show');
+   document.querySelector('#smartInput').value='';
+   pending=[];
+   toast('הארוחה נוספה');
+ };
+}
+function updatePreviewTotal(){
+ const el=document.querySelector('#previewTotal'); if(!el)return;
+ const c=round(pending.reduce((s,x)=>s+(+x.cal||0),0));
+ const pr=round(pending.reduce((s,x)=>s+(+x.protein||0),0),1);
+ el.textContent=`סה״כ: ${c} קל׳ · ${pr}g חלבון`;
+}
 function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
 
 quickFoods.forEach(([n,c,p])=>{const b=document.createElement('button');b.textContent=n;b.onclick=()=>addFood(n,c,p);document.querySelector('#quick').appendChild(b)});
-document.querySelector('#analyzeBtn').onclick=openInChatGPT;
-document.querySelector('#pasteChatGPT').onclick=()=>{document.querySelector('#chatgptResult').value='';showModal('#chatgptResultModal')};
+document.querySelector('#analyzeBtn').onclick=()=>renderPreview(parseSmart(document.querySelector('#smartInput').value));
+document.querySelector('#chatgptBtn').onclick=()=>showModal('#chatgptModal');
+document.querySelector('#openChatGPT').onclick=openInChatGPT;
 document.querySelector('#importChatGPT').onclick=importChatGPTResult;
 document.querySelector('#manualBtn').onclick=()=>showModal('#manualModal');
 document.querySelector('#settingsBtn').onclick=()=>{document.querySelector('#goalCal').value=state.settings.calories;document.querySelector('#goalProtein').value=state.settings.protein;showModal('#settingsModal')};
@@ -126,5 +271,11 @@ document.querySelectorAll('.closeModal').forEach(b=>b.onclick=hideModals);docume
 document.querySelector('#saveManual').onclick=()=>{const n=document.querySelector('#manualName').value.trim(),c=+document.querySelector('#manualCal').value,p=+document.querySelector('#manualProtein').value;if(!n||c<0||p<0)return toast('יש להשלים את הפרטים');addFood(n,c,p);['manualName','manualCal','manualProtein'].forEach(id=>document.querySelector('#'+id).value='');hideModals()};
 document.querySelector('#saveSettings').onclick=()=>{const c=+document.querySelector('#goalCal').value,p=+document.querySelector('#goalProtein').value;if(c<=0||p<=0)return;state.settings={calories:c,protein:p};save();render();hideModals();toast('היעדים עודכנו')};
 document.querySelector('#prevDay').onclick=()=>moveDay(-1);document.querySelector('#nextDay').onclick=()=>moveDay(1);
+document.querySelector('#smartInput').addEventListener('keydown',e=>{
+ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){
+   e.preventDefault();
+   renderPreview(parseSmart(e.currentTarget.value));
+ }
+});
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}))}
 render();
